@@ -15,25 +15,34 @@ function parseRetryDelayMs(raw: string): number | null {
 }
 
 function isRetryableQuotaError(error: any, normalizedErrorMsg: string): boolean {
-  const rateLimitSignals = [
+  const transientSignals = [
     'quota exceeded',
     'rate limit exceeded',
     'resource exhausted',
     'resource_exhausted',
-    'too many requests',
-    'daily limit reached'
+    'too many requests'
+  ];
+
+  const nonRetryableSignals = [
+    'billing not enabled',
+    'daily limit reached',
+    'per day',
+    'free_tier_requests'
   ];
 
   const statusCode = Number(error?.status ?? error?.code ?? error?.response?.status);
   const statusText = (error?.statusText ?? '').toString().toLowerCase();
   const reason = (error?.details?.reason || error?.reason || '').toString().toLowerCase();
+  const hasNonRetryableSignal = nonRetryableSignals.some(signal => normalizedErrorMsg.includes(signal));
+
+  if (hasNonRetryableSignal) return false;
 
   return (
     statusCode === 429 ||
     statusText.includes('resource_exhausted') ||
     reason.includes('rate_limit') ||
     reason.includes('quota') ||
-    rateLimitSignals.some(signal => normalizedErrorMsg.includes(signal))
+    transientSignals.some(signal => normalizedErrorMsg.includes(signal))
   );
 }
 
@@ -81,7 +90,10 @@ export async function callGemini(params: GenerateContentParameters, retries = 3,
       const isPermissionIssue = isPermissionOrBillingError(error, normalizedErrorMsg);
       
       if (isRateLimit && attempt < retries) {
-        const suggestedDelay = parseRetryDelayMs(errorMsg);
+        const retryDelayFromDetails = Number(error?.details?.find?.((d: any) => d?.retryDelay)?.retryDelay?.replace?.('s', '')) * 1000;
+        const suggestedDelay = Number.isFinite(retryDelayFromDetails) && retryDelayFromDetails > 0
+          ? retryDelayFromDetails
+          : parseRetryDelayMs(errorMsg);
         const backoffDelay = suggestedDelay ?? delay * Math.pow(2, attempt);
         console.warn(`Gemini quota/rate-limit issue detected. Retrying in ${backoffDelay}ms... (Attempt ${attempt + 1}/${retries})`);
         await new Promise(resolve => setTimeout(resolve, backoffDelay));
