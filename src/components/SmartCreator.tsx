@@ -375,35 +375,41 @@ export function SmartCreator({ onBack, onLessonCreated, initialText = "" }: Smar
               const topicIdNum = topic.steps?.[0]?.topicId || baseTopicId;
 
               if (selectedSubTopicId) {
-                // Find the specific step to merge into
+                // Find the specific step and add extra info as NEW pages after it
                 const stepIndex = topic.steps.findIndex((s: any) => s.id === selectedSubTopicId);
                 if (stepIndex >= 0) {
                   const targetStep = topic.steps[stepIndex];
                   const pageIdx = targetStep.pageIdx;
 
                   if (topic.grammarData?.content) {
-                    // Ensure content array is large enough (should be)
-                    if (!topic.grammarData.content[pageIdx]) {
-                      topic.grammarData.content[pageIdx] = {
-                        title: targetStep.title,
-                        keyPoints: [],
-                        examples: [],
-                        text: ""
-                      };
-                    }
+                    const additionalContent = result.subtopics.map((sub: any, sIdx: number) => ({
+                      title: sub.title || `${targetStep.title} - Extra ${sIdx + 1}`,
+                      category: sub.category,
+                      keyPoints: sub.keyPoints || [],
+                      text: (sub.content || "").replace(/\*/g, ''),
+                      examples: sub.examples || [],
+                      practice: sub.practice || [],
+                      sourcePage: sub.sourcePage || ""
+                    }));
 
-                    // Merge ALL subtopics from this AI result chunk into the target category
-                    result.subtopics.forEach((newContentFromAI: any) => {
-                      const existingContent = topic.grammarData.content[pageIdx];
-                      
-                      topic.grammarData.content[pageIdx] = {
-                        ...existingContent,
-                        keyPoints: [...(existingContent.keyPoints || []), ...(newContentFromAI.keyPoints || [])].slice(0, 20),
-                        examples: [...(existingContent.examples || []), ...(newContentFromAI.examples || [])].slice(0, 15),
-                        practice: [...(existingContent.practice || []), ...(newContentFromAI.practice || [])].slice(0, 20),
-                        text: (existingContent.text ? existingContent.text + "\n\n" : "") + newContentFromAI.content.replace(/\*/g, '')
-                      };
-                    });
+                    const insertionPageIdx = pageIdx + 1;
+                    topic.grammarData.content.splice(insertionPageIdx, 0, ...additionalContent);
+
+                    const newSteps = additionalContent.map((sub: any, sIdx: number) => ({
+                      id: `custom-step-${Date.now()}-${idx}-${sIdx}`,
+                      title: sub.title,
+                      subtitle: "",
+                      topicId: topicIdNum,
+                      pageIdx: insertionPageIdx + sIdx,
+                      status: 'completed'
+                    }));
+
+                    // Shift subsequent page indexes
+                    topic.steps = topic.steps.map((s: any) =>
+                      s.pageIdx >= insertionPageIdx ? { ...s, pageIdx: s.pageIdx + additionalContent.length } : s
+                    );
+
+                    topic.steps.splice(stepIndex + 1, 0, ...newSteps);
                   }
                 }
               } else {
