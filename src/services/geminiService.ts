@@ -23,11 +23,28 @@ export async function callGemini(params: GenerateContentParameters, retries = 3,
       return response;
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
-      const isRateLimit = errorMsg.includes('429') || error?.status === 429;
+      const normalizedErrorMsg = errorMsg.toLowerCase();
+
+      const rateLimitSignals = [
+        '429',
+        'quota exceeded',
+        'rate limit exceeded',
+        'resource exhausted',
+        'billing not enabled',
+        'daily limit reached'
+      ];
+
+      const statusCode = error?.status ?? error?.code ?? error?.response?.status;
+      const reason = (error?.details?.reason || error?.reason || '').toString().toLowerCase();
+      const isRateLimit =
+        statusCode === 429 ||
+        reason.includes('rate_limit') ||
+        reason.includes('quota') ||
+        rateLimitSignals.some(signal => normalizedErrorMsg.includes(signal));
       
       if (isRateLimit && attempt < retries) {
         const backoffDelay = delay * Math.pow(2, attempt);
-        console.warn(`Gemini Rate Limit (429) hit. Retrying in ${backoffDelay}ms... (Attempt ${attempt + 1}/${retries})`);
+        console.warn(`Gemini quota/rate-limit issue detected. Retrying in ${backoffDelay}ms... (Attempt ${attempt + 1}/${retries})`);
         await new Promise(resolve => setTimeout(resolve, backoffDelay));
         continue;
       }
