@@ -7,6 +7,7 @@ import { toPng } from 'html-to-image';
 import { callGemini } from '../services/geminiService';
 
 interface VocabWord {
+  pronunciation?: string;
   word: string;
   meaning: string;
   synonyms: string[];
@@ -97,7 +98,7 @@ export function VocabView({ onSearchSynonym }: VocabViewProps) {
       // Fetch some words if pool is low
       if (wordPool.length < 5) {
         const wordPrompt = `Pool 20 random English vocab words (intermediate/advanced). 
-Return JSON array with objects: word, meaning(Bengali), synonyms(5), sentence(English), sentenceMeaning(Bengali).`;
+Return JSON array with objects: word, pronunciation(Bengali or English IPA), meaning(Bengali), synonyms(5), sentence(English), sentenceMeaning(Bengali).`;
         const wordResp = await callGemini({
           model: "gemini-2.5-flash",
           contents: [{ role: 'user', parts: [{ text: wordPrompt }] }],
@@ -109,12 +110,13 @@ Return JSON array with objects: word, meaning(Bengali), synonyms(5), sentence(En
                 type: Type.OBJECT,
                 properties: {
                   word: { type: Type.STRING },
+                  pronunciation: { type: Type.STRING },
                   meaning: { type: Type.STRING },
                   synonyms: { type: Type.ARRAY, items: { type: Type.STRING } },
                   sentence: { type: Type.STRING },
                   sentenceMeaning: { type: Type.STRING }
                 },
-                required: ["word", "meaning", "synonyms", "sentence", "sentenceMeaning"]
+                required: ["word", "pronunciation", "meaning", "synonyms", "sentence", "sentenceMeaning"]
               }
             }
           }
@@ -200,7 +202,7 @@ Extract vocab list: word, pronunciation(Bengali), meaning(Bengali). JSON.`;
     try {
       const apiKey = getApiKey();
       const prompt = `Generate 10 random English vocab words. 
-JSON: word, meaning(Bengali), synonyms(5), sentence(English), sentenceMeaning(Bengali).`;
+JSON: word, pronunciation, meaning(Bengali), synonyms(5), sentence(English), sentenceMeaning(Bengali).`;
 
       const response = await callGemini({
         model: "gemini-2.5-flash",
@@ -213,12 +215,13 @@ JSON: word, meaning(Bengali), synonyms(5), sentence(English), sentenceMeaning(Be
               type: Type.OBJECT,
               properties: {
                 word: { type: Type.STRING },
+                pronunciation: { type: Type.STRING },
                 meaning: { type: Type.STRING },
                 synonyms: { type: Type.ARRAY, items: { type: Type.STRING } },
                 sentence: { type: Type.STRING },
                 sentenceMeaning: { type: Type.STRING }
               },
-              required: ["word", "meaning", "synonyms", "sentence", "sentenceMeaning"]
+              required: ["word", "pronunciation", "meaning", "synonyms", "sentence", "sentenceMeaning"]
             }
           }
         }
@@ -328,6 +331,7 @@ Extract vocab list: word, pronunciation(Bengali), meaning(Bengali). JSON.`;
 Provide exactly one English vocab word matching.
 JSON format:
 - word: English
+- pronunciation: Pronunciation
 - meaning: Bengali
 - synonyms: [5 English]
 - sentence: English
@@ -346,12 +350,13 @@ Return JSON array with one object.`;
               type: Type.OBJECT,
               properties: {
                 word: { type: Type.STRING },
+                pronunciation: { type: Type.STRING },
                 meaning: { type: Type.STRING },
                 synonyms: { type: Type.ARRAY, items: { type: Type.STRING } },
                 sentence: { type: Type.STRING },
                 sentenceMeaning: { type: Type.STRING }
               },
-              required: ["word", "meaning", "synonyms", "sentence", "sentenceMeaning"]
+              required: ["word", "pronunciation", "meaning", "synonyms", "sentence", "sentenceMeaning"]
             }
           }
         }
@@ -499,6 +504,9 @@ Return JSON array with one object.`;
         <div className="flex justify-between items-start mb-2">
           <div>
             <h3 className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-100 capitalize">{item.word}</h3>
+            {item.pronunciation && (
+              <p className="text-[10px] text-slate-400 font-bold italic tracking-wider">/{item.pronunciation}/</p>
+            )}
             <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">{item.meaning}</p>
             {item.sentence && (
               <div className="mt-2 mb-2 border-l-4 border-indigo-200 dark:border-indigo-800 pl-3 py-0.5">
