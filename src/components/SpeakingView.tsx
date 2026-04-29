@@ -181,6 +181,14 @@ export function SpeakingView({ onBack }: SpeakingViewProps) {
 
   const startCamera = async () => {
     setCameraError(null);
+    if (!window.isSecureContext) {
+      setCameraError("Camera/Microphone requires HTTPS or localhost. APK WebView builds without a secure context cannot show permission popups.");
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError("This phone WebView/browser does not support camera permission prompts for this app.");
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       if (videoRef.current) {
@@ -191,6 +199,8 @@ export function SpeakingView({ onBack }: SpeakingViewProps) {
       console.error("Error accessing camera:", err);
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         setCameraError("Camera/Microphone permission was denied. Please allow access in your browser settings and refresh.");
+      } else if (err.name === 'NotFoundError') {
+        setCameraError("No camera or microphone device was found on this phone.");
       } else {
         setCameraError("Could not access camera. Please ensure it's not being used by another app.");
       }

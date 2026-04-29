@@ -455,7 +455,11 @@ Return JSON array with one object.`;
         const link = document.createElement('a');
         link.download = `${title.replace(/\s+/g, '_')}_story.png`;
         link.href = dataUrl;
+        link.rel = 'noopener';
+        link.target = '_blank';
+        document.body.appendChild(link);
         link.click();
+        link.remove();
     } catch (err) {
         console.error('Image generation failed:', err);
     } finally {

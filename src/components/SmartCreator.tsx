@@ -109,7 +109,11 @@ export function SmartCreator({ onBack, onLessonCreated, initialText = "" }: Smar
       const a = document.createElement('a');
       a.href = url;
       a.download = `grammar_backup_${new Date().toISOString().split('T')[0]}.json`;
+      a.rel = 'noopener';
+      a.target = '_blank';
+      document.body.appendChild(a);
       a.click();
+      a.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Export failed:", err);
