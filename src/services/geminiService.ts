@@ -1,5 +1,42 @@
 import { GoogleGenAI, GenerateContentParameters, ThinkingLevel, Type } from "@google/genai";
 
+function parseRetryDelayMs(raw: string): number | null {
+  const retryDelayMatch = raw.match(/"retryDelay"\s*:\s*"(\d+)s"/i);
+  if (retryDelayMatch) {
+    return Number(retryDelayMatch[1]) * 1000;
+  }
+
+  const retryInMatch = raw.match(/retry in\s+(\d+(?:\.\d+)?)s/i);
+  if (retryInMatch) {
+    return Math.ceil(Number(retryInMatch[1]) * 1000);
+  }
+
+  return null;
+}
+
+function isRetryableQuotaError(error: any, normalizedErrorMsg: string): boolean {
+  const rateLimitSignals = [
+    'quota exceeded',
+    'rate limit exceeded',
+    'resource exhausted',
+    'resource_exhausted',
+    'too many requests',
+    'daily limit reached'
+  ];
+
+  const statusCode = Number(error?.status ?? error?.code ?? error?.response?.status);
+  const statusText = (error?.statusText ?? '').toString().toLowerCase();
+  const reason = (error?.details?.reason || error?.reason || '').toString().toLowerCase();
+
+  return (
+    statusCode === 429 ||
+    statusText.includes('resource_exhausted') ||
+    reason.includes('rate_limit') ||
+    reason.includes('quota') ||
+    rateLimitSignals.some(signal => normalizedErrorMsg.includes(signal))
+  );
+}
+
 /**
  * Robust wrapper for Gemini API calls with exponential backoff for rate limits.
  */
@@ -24,26 +61,11 @@ export async function callGemini(params: GenerateContentParameters, retries = 3,
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
       const normalizedErrorMsg = errorMsg.toLowerCase();
-
-      const rateLimitSignals = [
-        '429',
-        'quota exceeded',
-        'rate limit exceeded',
-        'resource exhausted',
-        'billing not enabled',
-        'daily limit reached'
-      ];
-
-      const statusCode = error?.status ?? error?.code ?? error?.response?.status;
-      const reason = (error?.details?.reason || error?.reason || '').toString().toLowerCase();
-      const isRateLimit =
-        statusCode === 429 ||
-        reason.includes('rate_limit') ||
-        reason.includes('quota') ||
-        rateLimitSignals.some(signal => normalizedErrorMsg.includes(signal));
+      const isRateLimit = isRetryableQuotaError(error, normalizedErrorMsg);
       
       if (isRateLimit && attempt < retries) {
-        const backoffDelay = delay * Math.pow(2, attempt);
+        const suggestedDelay = parseRetryDelayMs(errorMsg);
+        const backoffDelay = suggestedDelay ?? delay * Math.pow(2, attempt);
         console.warn(`Gemini quota/rate-limit issue detected. Retrying in ${backoffDelay}ms... (Attempt ${attempt + 1}/${retries})`);
         await new Promise(resolve => setTimeout(resolve, backoffDelay));
         continue;
