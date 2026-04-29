@@ -28,41 +28,12 @@ jobs:
             cp index.html dist/ 2>/dev/null || true
           fi
 
-      - name: Setup Capacitor Config
-        run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          
-          
-          
-          cat <<EOF > capacitor.config.json
-          {
-            "appId": "com.vocabstory.app",
-            "appName": "GrammarBD",
-            "webDir": "dist",
-            "server": {
-              "androidScheme": "https",
-              "hostname": "localhost",
-              "cleartext": true
-            }
-          }
-          EOF
-          
-          npx cap add android || true
-          npx cap sync android
+      - name: Sync Capacitor Assets
+        run: npx cap sync android
 
       - name: Build Android APK
         run: |
           cd android
-          
-          
-          echo "configurations.all {
-              resolutionStrategy.eachDependency { DependencyResolveDetails details ->
-                  if (details.requested.group == 'org.jetbrains.kotlin') {
-                      details.useVersion '1.8.22'
-                  }
-              }
-          }" >> app/build.gradle
-          
           chmod +x gradlew
           ./gradlew assembleDebug
 
