@@ -11,6 +11,15 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Fix Gradle Wrapper JAR
+        run: |
+          GRADLE_VERSION=$(grep distributionUrl android/gradle/wrapper/gradle-wrapper.properties | sed 's/.*gradle-\(.*\)-bin.zip/\1/')
+          echo "Gradle version: $GRADLE_VERSION"
+          curl -L "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o gradle.zip
+          unzip -q gradle.zip
+          cp "gradle-${GRADLE_VERSION}/lib/gradle-wrapper.jar" android/gradle/wrapper/gradle-wrapper.jar
+          rm -rf gradle.zip "gradle-${GRADLE_VERSION}"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
