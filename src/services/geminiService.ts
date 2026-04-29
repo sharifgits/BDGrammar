@@ -37,6 +37,22 @@ function isRetryableQuotaError(error: any, normalizedErrorMsg: string): boolean 
   );
 }
 
+function isPermissionOrBillingError(error: any, normalizedErrorMsg: string): boolean {
+  const statusCode = Number(error?.status ?? error?.code ?? error?.response?.status);
+  const statusText = (error?.statusText ?? '').toString().toLowerCase();
+  const reason = (error?.details?.reason || error?.reason || '').toString().toLowerCase();
+
+  return (
+    statusCode === 401 ||
+    statusCode === 403 ||
+    statusText.includes('permission_denied') ||
+    reason.includes('permission') ||
+    normalizedErrorMsg.includes('permission denied') ||
+    normalizedErrorMsg.includes('billing not enabled') ||
+    normalizedErrorMsg.includes('api key not valid')
+  );
+}
+
 /**
  * Robust wrapper for Gemini API calls with exponential backoff for rate limits.
  */
@@ -62,6 +78,7 @@ export async function callGemini(params: GenerateContentParameters, retries = 3,
       const errorMsg = error?.message || String(error);
       const normalizedErrorMsg = errorMsg.toLowerCase();
       const isRateLimit = isRetryableQuotaError(error, normalizedErrorMsg);
+      const isPermissionIssue = isPermissionOrBillingError(error, normalizedErrorMsg);
       
       if (isRateLimit && attempt < retries) {
         const suggestedDelay = parseRetryDelayMs(errorMsg);
@@ -69,6 +86,10 @@ export async function callGemini(params: GenerateContentParameters, retries = 3,
         console.warn(`Gemini quota/rate-limit issue detected. Retrying in ${backoffDelay}ms... (Attempt ${attempt + 1}/${retries})`);
         await new Promise(resolve => setTimeout(resolve, backoffDelay));
         continue;
+      }
+
+      if (isPermissionIssue) {
+        throw new Error("Gemini API access denied. Check API key permissions and enable billing for your project in Google AI Studio.");
       }
       
       console.error("Gemini API Error details:", error);
