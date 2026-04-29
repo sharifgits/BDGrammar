@@ -21,35 +21,8 @@ export function SettingsView({ onNavigateToAI }: SettingsViewProps) {
         return saved === 'true';
       }
     }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return document.documentElement.classList.contains('dark');
   });
-
-  const [notificationsEnabled, setNotificationsEnabled] = useState(() => localStorage.getItem('notificationsEnabled') === 'true');
-
-  const toggleNotifications = async () => {
-    if (!notificationsEnabled) {
-      if ('Notification' in window) {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          setNotificationsEnabled(true);
-          localStorage.setItem('notificationsEnabled', 'true');
-        } else {
-          alert('Notification permission denied.');
-        }
-      } else {
-        alert('This browser does not support notifications.');
-      }
-    } else {
-      setNotificationsEnabled(false);
-      localStorage.setItem('notificationsEnabled', 'false');
-    }
-  };
-
-  React.useEffect(() => {
-    // Note: True daily background notifications require a Service Worker,
-    // which is not supported in this runtime environment.
-    // For now, this just demonstrates the notification browser capability when authorized.
-  }, [notificationsEnabled]);
 
   const handleSaveKey = () => {
     localStorage.setItem('GEMINI_API_KEY', apiKey);
@@ -80,7 +53,6 @@ export function SettingsView({ onNavigateToAI }: SettingsViewProps) {
       setTimeout(() => setTestStatus(null), 5000);
     }
   };
-
 
   React.useEffect(() => {
     if (isDarkMode) {
@@ -202,43 +174,7 @@ export function SettingsView({ onNavigateToAI }: SettingsViewProps) {
 
                <section className="space-y-3">
                   <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] px-2 flex items-center gap-2">
-                    <Bell size={12} /> Notifications
-                  </h4>
-                  <button 
-                      onClick={toggleNotifications}
-                      className={`w-full p-4 bg-white dark:bg-slate-800 border-2 ${notificationsEnabled ? 'border-emerald-500' : 'border-slate-50 dark:border-slate-800'} rounded-2xl flex items-center justify-between group hover:border-indigo-500 transition-all`}
-                    >
-                       <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 ${notificationsEnabled ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 dark:bg-slate-700 text-slate-400'} rounded-lg flex items-center justify-center`}>
-                             <Bell size={20} />
-                          </div>
-                          <div className="text-left">
-                             <p className="font-black text-sm text-slate-800 dark:text-white">Daily Practice Reminder</p>
-                             <p className="text-[10px] text-slate-400 font-medium">{notificationsEnabled ? "Notifications enabled" : "Receive a daily reminder"}</p>
-                             <span
-                               onClick={(e) => {
-                                 e.stopPropagation();
-                                 if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
-                                    new Notification("GrammarBD Test", { body: "This is a test notification!" });
-                                 } else {
-                                    alert('Please enable notifications first.');
-                                 }
-                               }}
-                               className="text-[9px] mt-1 text-indigo-500 font-black uppercase tracking-widest hover:underline cursor-pointer"
-                             >
-                               Test Notification
-                             </span>
-                          </div>
-                       </div>
-                       <div className={`w-8 h-4 rounded-full ${notificationsEnabled ? 'bg-emerald-500' : 'bg-slate-200'} transition-colors flex items-center ${notificationsEnabled ? 'justify-end' : 'justify-start'} px-0.5`}>
-                         <div className="w-3 h-3 rounded-full bg-white"></div>
-                       </div>
-                    </button>
-               </section>
-
-               <section className="space-y-3">
-                  <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] px-2 flex items-center gap-2">
-                    <Globe size={12} /> App Preferences
+                    <Globe size={12} /> Preferences
                   </h4>
                   <div className="space-y-2">
                      {[

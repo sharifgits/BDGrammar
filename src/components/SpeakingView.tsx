@@ -132,14 +132,10 @@ export function SpeakingView({ onBack }: SpeakingViewProps) {
       const response = await callGemini({
         model: "gemini-2.5-flash",
         config: {
-          systemInstruction: `You are a friendly, engaging, and highly conversational English practice partner named ${selectedPartner.name}.
-Your goal is to simulate a truly natural, human-like interaction aimed at learners.
-- Use conversational fillers naturally (e.g., "Oh, that's interesting!", "Hmm, let me think...", "Well, actually...").
-- Always ask relevant follow-up questions based on what the user just said to keep the dialogue flowing smoothly.
-- Include emotional cues or reactions to show you are listening effectively (e.g., "That sounds exciting!", "I can totally see why you'd say that").
-- Keep your tone casual, warm, and highly encouraging.
-- Never be stiff, robot-like, or overly formal.
-- Keep your responses concise to facilitate frequent turn-taking and practice.`,
+          systemInstruction: `You are a friendly and engaging conversation partner named ${selectedPartner.name}. 
+          Conduct a casual and natural conversation in English. 
+          Avoid being overly formal. Ask follow-up questions, share "thoughts," and keep the dialogue flowing naturally. 
+          Respond with warmth and interest.`,
         },
         contents: history.map(h => ({ 
           role: h.role === 'user' ? 'user' : 'model', 
