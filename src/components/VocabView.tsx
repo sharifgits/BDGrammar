@@ -465,10 +465,22 @@ Return JSON array with one object.`;
             cacheBust: true,
         });
         const link = document.createElement('a');
-        link.download = `${title.replace(/\s+/g, '_')}_story.png`;
+        const fileName = `${title.replace(/\s+/g, '_')}_story.png`;
+
+        // Mobile/WebView fallback: use native share if supported
+        if (navigator.canShare && navigator.share) {
+          const res = await fetch(dataUrl);
+          const blob = await res.blob();
+          const file = new File([blob], fileName, { type: 'image/png' });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: fileName });
+            return;
+          }
+        }
+
+        link.download = fileName;
         link.href = dataUrl;
         link.rel = 'noopener';
-        link.target = '_blank';
         document.body.appendChild(link);
         link.click();
         link.remove();

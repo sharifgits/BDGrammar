@@ -105,16 +105,26 @@ export function SmartCreator({ onBack, onLessonCreated, initialText = "" }: Smar
         return;
       }
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const fileName = `grammar_backup_${new Date().toISOString().split('T')[0]}.json`;
+
+      // Mobile/WebView fallback: use native share sheet if available
+      if (navigator.canShare && navigator.share) {
+        const file = new File([blob], fileName, { type: 'application/json' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: fileName });
+          return;
+        }
+      }
+
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `grammar_backup_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = fileName;
       a.rel = 'noopener';
-      a.target = '_blank';
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
       console.error("Export failed:", err);
       alert("Failed to export data.");
