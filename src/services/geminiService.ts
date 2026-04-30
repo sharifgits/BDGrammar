@@ -25,9 +25,7 @@ function isRetryableQuotaError(error: any, normalizedErrorMsg: string): boolean 
 
   const nonRetryableSignals = [
     'billing not enabled',
-    'daily limit reached',
-    'per day',
-    'free_tier_requests'
+    'daily limit reached'
   ];
 
   const statusCode = Number(error?.status ?? error?.code ?? error?.response?.status);
@@ -35,7 +33,8 @@ function isRetryableQuotaError(error: any, normalizedErrorMsg: string): boolean 
   const reason = (error?.details?.reason || error?.reason || '').toString().toLowerCase();
   const hasNonRetryableSignal = nonRetryableSignals.some(signal => normalizedErrorMsg.includes(signal));
 
-  if (hasNonRetryableSignal) return false;
+  const retryDelayHint = parseRetryDelayMs(normalizedErrorMsg);
+  if (hasNonRetryableSignal && !retryDelayHint) return false;
 
   return (
     statusCode === 429 ||
