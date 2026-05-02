@@ -1,5 +1,66 @@
 import { GoogleGenAI, GenerateContentParameters, ThinkingLevel, Type } from "@google/genai";
 
+function parseRetryDelayMs(raw: string): number | null {
+  const retryDelayMatch = raw.match(/"retryDelay"\s*:\s*"(\d+)s"/i);
+  if (retryDelayMatch) {
+    return Number(retryDelayMatch[1]) * 1000;
+  }
+
+  const retryInMatch = raw.match(/retry in\s+(\d+(?:\.\d+)?)s/i);
+  if (retryInMatch) {
+    return Math.ceil(Number(retryInMatch[1]) * 1000);
+  }
+
+  return null;
+}
+
+function isRetryableQuotaError(error: any, normalizedErrorMsg: string): boolean {
+  const transientSignals = [
+    'quota exceeded',
+    'rate limit exceeded',
+    'resource exhausted',
+    'resource_exhausted',
+    'too many requests'
+  ];
+
+  const nonRetryableSignals = [
+    'billing not enabled',
+    'daily limit reached'
+  ];
+
+  const statusCode = Number(error?.status ?? error?.code ?? error?.response?.status);
+  const statusText = (error?.statusText ?? '').toString().toLowerCase();
+  const reason = (error?.details?.reason || error?.reason || '').toString().toLowerCase();
+  const hasNonRetryableSignal = nonRetryableSignals.some(signal => normalizedErrorMsg.includes(signal));
+
+  const retryDelayHint = parseRetryDelayMs(normalizedErrorMsg);
+  if (hasNonRetryableSignal && !retryDelayHint) return false;
+
+  return (
+    statusCode === 429 ||
+    statusText.includes('resource_exhausted') ||
+    reason.includes('rate_limit') ||
+    reason.includes('quota') ||
+    transientSignals.some(signal => normalizedErrorMsg.includes(signal))
+  );
+}
+
+function isPermissionOrBillingError(error: any, normalizedErrorMsg: string): boolean {
+  const statusCode = Number(error?.status ?? error?.code ?? error?.response?.status);
+  const statusText = (error?.statusText ?? '').toString().toLowerCase();
+  const reason = (error?.details?.reason || error?.reason || '').toString().toLowerCase();
+
+  return (
+    statusCode === 401 ||
+    statusCode === 403 ||
+    statusText.includes('permission_denied') ||
+    reason.includes('permission') ||
+    normalizedErrorMsg.includes('permission denied') ||
+    normalizedErrorMsg.includes('billing not enabled') ||
+    normalizedErrorMsg.includes('api key not valid')
+  );
+}
+
 /**
  * Robust wrapper for Gemini API calls with exponential backoff for rate limits.
  */
@@ -23,13 +84,23 @@ export async function callGemini(params: GenerateContentParameters, retries = 3,
       return response;
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
-      const isRateLimit = errorMsg.includes('429') || error?.status === 429;
+      const normalizedErrorMsg = errorMsg.toLowerCase();
+      const isRateLimit = isRetryableQuotaError(error, normalizedErrorMsg);
+      const isPermissionIssue = isPermissionOrBillingError(error, normalizedErrorMsg);
       
       if (isRateLimit && attempt < retries) {
-        const backoffDelay = delay * Math.pow(2, attempt);
-        console.warn(`Gemini Rate Limit (429) hit. Retrying in ${backoffDelay}ms... (Attempt ${attempt + 1}/${retries})`);
+        const retryDelayFromDetails = Number(error?.details?.find?.((d: any) => d?.retryDelay)?.retryDelay?.replace?.('s', '')) * 1000;
+        const suggestedDelay = Number.isFinite(retryDelayFromDetails) && retryDelayFromDetails > 0
+          ? retryDelayFromDetails
+          : parseRetryDelayMs(errorMsg);
+        const backoffDelay = suggestedDelay ?? delay * Math.pow(2, attempt);
+        console.warn(`Gemini quota/rate-limit issue detected. Retrying in ${backoffDelay}ms... (Attempt ${attempt + 1}/${retries})`);
         await new Promise(resolve => setTimeout(resolve, backoffDelay));
         continue;
+      }
+
+      if (isPermissionIssue) {
+        throw new Error("Gemini API access denied. Check API key permissions and enable billing for your project in Google AI Studio.");
       }
       
       console.error("Gemini API Error details:", error);

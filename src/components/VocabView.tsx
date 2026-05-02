@@ -29,6 +29,18 @@ interface VocabViewProps {
   onSearchSynonym: (word: string) => void;
 }
 
+const isQuotaOrRateLimitError = (msg: string = "") => {
+  const normalized = msg.toLowerCase();
+  return [
+    '429',
+    'quota exceeded',
+    'rate limit exceeded',
+    'resource exhausted',
+    'resource_exhausted',
+    'daily limit reached'
+  ].some(signal => normalized.includes(signal));
+};
+
 export function VocabView({ onSearchSynonym }: VocabViewProps) {
   const [words, setWords] = useState<VocabWord[]>([]);
   const [currentStory, setCurrentStory] = useState<VocabStory | null>(null);
@@ -173,9 +185,9 @@ Extract vocab list: word, pronunciation(Bengali), meaning(Bengali). JSON.`;
       }
     } catch (e: any) {
       console.error("Pool refill failed:", e);
-      if (e.message?.includes('429')) {
+      if (isQuotaOrRateLimitError(e?.message || String(e))) {
         setIsRateLimited(true);
-        setError("AI Rate limit reached. Background generation paused for 1 minute.");
+        setError("AI quota/rate limit reached. Background generation paused for 1 minute.");
         setTimeout(() => setIsRateLimited(false), 60000);
       }
     } finally {
@@ -229,9 +241,9 @@ JSON: word, meaning(Bengali), synonyms(5), sentence(English), sentenceMeaning(Be
       refillPools(); // Refill other items
     } catch (err: any) {
       console.error("AI Error:", err);
-      if (err.message?.includes('429')) {
+      if (isQuotaOrRateLimitError(err?.message || String(err))) {
         setIsRateLimited(true);
-        setError("AI Rate limit reached. Please wait a minute before trying again.");
+        setError("AI quota/rate limit reached. Please wait a minute before trying again.");
         setTimeout(() => setIsRateLimited(false), 60000);
       } else {
         setError(err.message || 'Failed to generate words.');
@@ -297,9 +309,9 @@ Extract vocab list: word, pronunciation(Bengali), meaning(Bengali). JSON.`;
       refillPools();
     } catch (err: any) {
       console.error("AI Error:", err);
-      if (err.message?.includes('429')) {
+      if (isQuotaOrRateLimitError(err?.message || String(err))) {
         setIsRateLimited(true);
-        setError("AI Rate limit reached. Please wait a minute before trying again.");
+        setError("AI quota/rate limit reached. Please wait a minute before trying again.");
         setTimeout(() => setIsRateLimited(false), 60000);
       } else {
         setError(err.message || 'Failed to generate story.');
@@ -453,9 +465,25 @@ Return JSON array with one object.`;
             cacheBust: true,
         });
         const link = document.createElement('a');
-        link.download = `${title.replace(/\s+/g, '_')}_story.png`;
+        const fileName = `${title.replace(/\s+/g, '_')}_story.png`;
+
+        // Mobile/WebView fallback: use native share if supported
+        if (navigator.canShare && navigator.share) {
+          const res = await fetch(dataUrl);
+          const blob = await res.blob();
+          const file = new File([blob], fileName, { type: 'image/png' });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: fileName });
+            return;
+          }
+        }
+
+        link.download = fileName;
         link.href = dataUrl;
+        link.rel = 'noopener';
+        document.body.appendChild(link);
         link.click();
+        link.remove();
     } catch (err) {
         console.error('Image generation failed:', err);
     } finally {

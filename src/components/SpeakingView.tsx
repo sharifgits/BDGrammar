@@ -178,9 +178,26 @@ export function SpeakingView({ onBack }: SpeakingViewProps) {
   }, [isSessionActive]);
 
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const getMobileWebViewHint = () => {
+    const ua = navigator.userAgent.toLowerCase();
+    const isAndroid = ua.includes('android');
+    const isStandalone = window.matchMedia?.('(display-mode: standalone)')?.matches;
+    if (isAndroid || isStandalone) {
+      return "If this is an APK/WebView build, camera popups require native Android permissions (CAMERA + RECORD_AUDIO) and WebChromeClient permission forwarding in the app wrapper.";
+    }
+    return "Use HTTPS and allow permissions in browser site settings.";
+  };
 
   const startCamera = async () => {
     setCameraError(null);
+    if (!window.isSecureContext) {
+      setCameraError(`Camera/Microphone requires HTTPS or localhost. ${getMobileWebViewHint()}`);
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError(`This phone WebView/browser cannot request camera permissions for this app. ${getMobileWebViewHint()}`);
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       if (videoRef.current) {
@@ -190,7 +207,9 @@ export function SpeakingView({ onBack }: SpeakingViewProps) {
     } catch (err: any) {
       console.error("Error accessing camera:", err);
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setCameraError("Camera/Microphone permission was denied. Please allow access in your browser settings and refresh.");
+        setCameraError(`Camera/Microphone permission was denied. ${getMobileWebViewHint()}`);
+      } else if (err.name === 'NotFoundError') {
+        setCameraError("No camera or microphone device was found on this phone.");
       } else {
         setCameraError("Could not access camera. Please ensure it's not being used by another app.");
       }

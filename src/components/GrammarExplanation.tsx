@@ -549,6 +549,40 @@ export function GrammarExplanation({ topicId, initialPage = 0, isCustom, customD
         </div>
       </div>
 
+      {/* Lesson Page Navigation */}
+      {pages.length > 1 && !isEditing && viewMode === 'lesson' && (
+        <div className="absolute bottom-0 left-0 right-0 p-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] bg-white/95 dark:bg-slate-900/95 backdrop-blur border-t-2 border-slate-100 dark:border-slate-800 z-20">
+          <div className="md:max-w-2xl mx-auto w-full flex items-center gap-3">
+            <button
+              onClick={handlePrev}
+              disabled={isFirstPage}
+              className={classNames(
+                "flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all",
+                isFirstPage
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
+                  : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-100 active:scale-95"
+              )}
+            >
+              <ArrowLeft size={14} />
+              Previous
+            </button>
+            <button
+              onClick={handleNext}
+              disabled={isLastPage}
+              className={classNames(
+                "flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all",
+                isLastPage
+                  ? "bg-indigo-200/50 dark:bg-indigo-900/40 text-indigo-300 cursor-not-allowed"
+                  : "bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 active:scale-95"
+              )}
+            >
+              Next Lesson
+              <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Floating Action Bar / Page Controls (Only show when editing or loading) */}
       {(pages.length === 0 || isEditing) && (
         <div className="absolute bottom-0 left-0 right-0 p-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] bg-white dark:bg-slate-900 border-t-2 border-slate-100 dark:border-slate-800 z-20">
